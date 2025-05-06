@@ -1,52 +1,56 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
+	"sync/atomic"
 )
 
-type ENAresponse struct {
-    HostBodySite string `json:"host_body_site"`
-    HostTaxID string `json:"host_tax_id"`
-    Country string `"country"`
-    SubmittedFTP string `json:"submitted_ftp"`
+type apiconfig struct {
+    fileserverHits atomic.Int32
+    platform string
+    secretkey string
 }
 
 func main() {
-    baseURL := "https://www.ebi.ac.uk/ena/portal/api/results?dataPortal=ena"
-    queryParams := url.Values{}
-    queryParams.Set("result", "read_run")
-    queryParams.Set("query", `country="United Kingdom" AND host_tax_id=9913 AND host_body_site="rumen"`)
-    queryParams.Set("fields", "submitted_ftp,host_body_site,host_tax_id,country")
-    queryParams.Set("format", "json")
+    http.HandleFunc("/api/data", handleData)
 
-    fullURL := fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
-    fmt.Println(fullURL)
-
-    resp, err := http.Get(fullURL)
+    // Run server on port 8080
+    fmt.Println("Starting server on port 8080...")
+    err := http.ListenAndServe(":8080", nil)
     if err != nil {
-        fmt.Println("Error making request:", err)
-        return
-    }
-    defer resp.Body.Close()
-
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        fmt.Println("Error reading response body:", err)
-        return
+        panic(err)
     }
 
-    var results []ENAresponse
-    if err := json.Unmarshal(body, &results); err != nil {
-        fmt.Println("Error parsing JSON:", err)
+    /*
+    const filepathRoot = "."
+    port := os.Getenv("PORT")
+    fmt.Printf("port: %s", port)
+
+    godotenv.Load()
+    dbURL := os.Getenv("DB_URL")
+    if dbURL == "" {
+        log.Fatal("PLATFORM must be set")
+    }
+
+    mux := http.NewServeMux()
+
+    mux.Handle("GET /api/test", handlerPass)
+    */
+}
+
+func handleData(w http.ResponseWriter, r *http.Request) {
+    // CORS headers
+    w.Header().Set("Access-Control-Allow-Origin", "*")
+    w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+    if r.Method == "OPTIONS" {
+        // Stop here for preflight requests
+        w.WriteHeader(http.StatusOK)
         return
     }
 
-    fmt.Println("Raw Read Data Sets:")
-    for _, record := range results {
-        fmt.Printf("Country: %s, Host Tax ID: %s, Body Site: %s, FTP Link: %s\n", record.Country, record.HostTaxID, record.HostBodySite, record.SubmittedFTP)
-    }
+    w.Header().Set("Content-Type", "application/json")
+    fmt.Fprint(w, `{"message": "Hello from Go backend!"}`)
 }
